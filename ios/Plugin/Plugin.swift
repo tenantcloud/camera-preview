@@ -13,29 +13,31 @@ public class CameraPreview: CAPPlugin {
     let cameraController = CameraController()
     var width: CGFloat?
     var height: CGFloat?
+    var x: CGFloat?
+    var y: CGFloat?
     var paddingBottom: CGFloat?
     var rotateWhenOrientationChanged: Bool?
-    
+
     @objc func rotated() {
-        
+
         let height = self.paddingBottom != nil ? self.height! - self.paddingBottom!: self.height!;
 
         if UIDevice.current.orientation.isLandscape {
-            
-            self.previewView.frame = CGRect(x: 0, y: 0, width: height, height: self.width!)
+
+            self.previewView.frame = CGRect(x: self.x!, y: self.y!, width: height, height: self.width!)
             self.cameraController.previewLayer?.frame = self.previewView.frame
-            
+
             if (UIDevice.current.orientation == UIDeviceOrientation.landscapeLeft) {
                 self.cameraController.previewLayer?.connection?.videoOrientation = .landscapeRight
             }
-            
+
             if (UIDevice.current.orientation == UIDeviceOrientation.landscapeRight) {
                 self.cameraController.previewLayer?.connection?.videoOrientation = .landscapeLeft
             }
         }
 
         if UIDevice.current.orientation.isPortrait {
-            self.previewView.frame = CGRect(x: 0, y: 0, width: self.width!, height: height)
+            self.previewView.frame = CGRect(x: self.x!, y: self.y!, width: self.width!, height: height)
             self.cameraController.previewLayer?.frame = self.previewView.frame
             self.cameraController.previewLayer?.connection?.videoOrientation = .portrait
         }
@@ -43,7 +45,18 @@ public class CameraPreview: CAPPlugin {
 
     @objc func start(_ call: CAPPluginCall) {
         self.cameraPosition = call.getString("position") ?? "rear"
-        
+
+        if call.getFloat("x") != nil {
+            self.x = CGFloat(call.getFloat("x")!) / 2
+        } else {
+            self.x = 0
+        }
+        if call.getFloat("y") != nil {
+            self.y = CGFloat(call.getFloat("y")!) / 2
+        } else {
+            self.y = 0
+        }
+
         if call.getInt("width") != nil {
             self.width = CGFloat(call.getInt("width")!)
         } else {
@@ -73,7 +86,8 @@ public class CameraPreview: CAPPlugin {
                         call.reject(error.localizedDescription)
                         return
                     }
-                    self.previewView = UIView(frame: CGRect(x: 0, y: 0, width: self.width!, height: self.height!))
+
+                    self.previewView = UIView(frame: CGRect(x: self.x!, y: self.y!, width: self.width!, height: self.height!))
                     self.webView.isOpaque = false
                     self.webView.backgroundColor = UIColor.clear
                     self.webView.superview?.addSubview(self.previewView)
