@@ -200,8 +200,8 @@ public class CameraPreview extends Plugin implements CameraActivity.CameraPrevie
             position = "front";
         }
 
-        final Integer x = call.getInt("x", 0);
-        final Integer y = call.getInt("y", 0);
+        final Float x = call.getFloat("x", 0f);
+        final Float y = call.getFloat("y", 0f);
         final Integer width = call.getInt("width", 0);
         final Integer height = call.getInt("height", 0);
         final Integer paddingBottom = call.getInt("paddingBottom", 0);
