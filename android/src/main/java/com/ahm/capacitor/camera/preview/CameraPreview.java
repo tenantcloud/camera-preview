@@ -78,7 +78,7 @@ public class CameraPreview extends Plugin implements CameraActivity.CameraPrevie
     @PluginMethod()
     public void capture(PluginCall call) {
         if(this.hasCamera(call) == false){
-            call.error("Camera is not running");
+            call.reject("Camera is not running");
             return;
         }
 
@@ -115,7 +115,7 @@ public class CameraPreview extends Plugin implements CameraActivity.CameraPrevie
     @PluginMethod()
     public void getSupportedFlashModes(PluginCall call) {
         if(this.hasCamera(call) == false){
-            call.error("Camera is not running");
+            call.reject("Camera is not running");
             return;
         }
 
@@ -140,13 +140,13 @@ public class CameraPreview extends Plugin implements CameraActivity.CameraPrevie
     @PluginMethod()
     public void setFlashMode(PluginCall call) {
         if(this.hasCamera(call) == false){
-            call.error("Camera is not running");
+            call.reject("Camera is not running");
             return;
         }
 
         String flashMode = call.getString("flashMode");
         if(flashMode == null || flashMode.isEmpty() == true) {
-            call.error("flashMode required parameter is missing");
+            call.reject("flashMode required parameter is missing");
             return;
         }
 
@@ -158,7 +158,7 @@ public class CameraPreview extends Plugin implements CameraActivity.CameraPrevie
         if (supportedFlashModes.indexOf(flashMode) > -1) {
             params.setFlashMode(flashMode);
         } else {
-            call.error("Flash mode not recognised: " + flashMode);
+            call.reject("Flash mode not recognised: " + flashMode);
             return;
         }
 
