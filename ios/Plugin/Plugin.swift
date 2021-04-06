@@ -8,34 +8,40 @@ import AVFoundation
 @objc(CameraPreview)
 public class CameraPreview: CAPPlugin {
 
-    var previewView:UIView!
+    var previewView: UIView!
     var cameraPosition = String()
     let cameraController = CameraController()
-    var width: CGFloat?
-    var height: CGFloat?
+    var width: CGFloat = UIScreen.main.bounds.size.width
+    var height: CGFloat = UIScreen.main.bounds.size.height
+    var x: CGFloat = 0
+    var y: CGFloat = 0
     var paddingBottom: CGFloat?
     var rotateWhenOrientationChanged: Bool?
-    
+
     @objc func rotated() {
-        
-        let height = self.paddingBottom != nil ? self.height! - self.paddingBottom!: self.height!;
+
+        var height = self.height
+
+        if let paddingBottom = self.paddingBottom {
+            height = self.height - paddingBottom
+        }
 
         if UIDevice.current.orientation.isLandscape {
-            
-            self.previewView.frame = CGRect(x: 0, y: 0, width: height, height: self.width!)
+
+            self.previewView.frame = CGRect(x: self.x, y: self.y, width: height, height: self.width)
             self.cameraController.previewLayer?.frame = self.previewView.frame
-            
+
             if (UIDevice.current.orientation == UIDeviceOrientation.landscapeLeft) {
                 self.cameraController.previewLayer?.connection?.videoOrientation = .landscapeRight
             }
-            
+
             if (UIDevice.current.orientation == UIDeviceOrientation.landscapeRight) {
                 self.cameraController.previewLayer?.connection?.videoOrientation = .landscapeLeft
             }
         }
 
         if UIDevice.current.orientation.isPortrait {
-            self.previewView.frame = CGRect(x: 0, y: 0, width: self.width!, height: height)
+            self.previewView.frame = CGRect(x: self.x, y: self.y, width: self.width, height: height)
             self.cameraController.previewLayer?.frame = self.previewView.frame
             self.cameraController.previewLayer?.connection?.videoOrientation = .portrait
         }
@@ -43,22 +49,19 @@ public class CameraPreview: CAPPlugin {
 
     @objc func start(_ call: CAPPluginCall) {
         self.cameraPosition = call.getString("position") ?? "rear"
-        
-        if call.getInt("width") != nil {
-            self.width = CGFloat(call.getInt("width")!)
-        } else {
-            self.width = UIScreen.main.bounds.size.width
+
+        self.x = CGFloat(call.getInt("x", 0)) / UIScreen.main.scale
+        self.y = CGFloat(call.getInt("y", 0)) / UIScreen.main.scale
+
+        self.width = CGFloat(call.getFloat("width", Float(UIScreen.main.bounds.size.width)))
+        self.height = CGFloat(call.getFloat("height", Float(UIScreen.main.bounds.size.height)))
+
+        if let paddingBottom = call.getInt("paddingBottom") {
+            self.paddingBottom = CGFloat(paddingBottom)
         }
-        if call.getInt("height") != nil {
-            self.height = CGFloat(call.getInt("height")!)
-        } else {
-            self.height = UIScreen.main.bounds.size.height
-        }
-        if call.getInt("paddingBottom") != nil {
-            self.paddingBottom = CGFloat(call.getInt("paddingBottom")!)
-        }
+
         self.rotateWhenOrientationChanged = call.getBool("rotateWhenOrientationChanged") ?? true
-        
+
         if (self.rotateWhenOrientationChanged == true) {
             NotificationCenter.default.addObserver(self, selector: #selector(CameraPreview.rotated), name: UIDevice.orientationDidChangeNotification, object: nil)
         }
@@ -73,18 +76,21 @@ public class CameraPreview: CAPPlugin {
                         call.reject(error.localizedDescription)
                         return
                     }
-                    self.previewView = UIView(frame: CGRect(x: 0, y: 0, width: self.width!, height: self.height!))
 
                     guard let webView = self.webView else {
                         call.reject("Error. Can't get webView")
                         return
                     }
 
+                    self.previewView = UIView(frame: CGRect(x: self.x, y: self.y, width: self.width, height: self.height))
+
                     webView.isOpaque = false
                     webView.backgroundColor = UIColor.clear
                     webView.superview?.addSubview(self.previewView)
                     webView.superview?.bringSubviewToFront(webView)
+
                     try? self.cameraController.displayPreview(on: self.previewView)
+
                     call.resolve()
 
                 }
@@ -112,65 +118,85 @@ public class CameraPreview: CAPPlugin {
             }
 
             webView.isOpaque = true
+
             call.resolve()
         }
     }
 
     @objc func capture(_ call: CAPPluginCall) {
-        let quality: Int? = call.getInt("quality", 85)
-        
+        let quality: Int = call.getInt("quality", 85)
+
         self.cameraController.captureImage { (image, error) in
 
             guard let image = image else {
                 print(error ?? "Image capture error")
+
                 guard let error = error else {
                     call.reject("Image capture error")
                     return
                 }
+
                 call.reject(error.localizedDescription)
+
                 return
             }
 
-            let imageData = image.jpegData(compressionQuality: CGFloat(quality!))
-            let imageBase64 = imageData?.base64EncodedString()
-            call.resolve(["value": imageBase64!])
+            guard let imageData = image.jpegData(compressionQuality: CGFloat(quality)) else {
+                call.reject("Can't get image data")
+
+                return
+            }
+
+            let imageBase64 = imageData.base64EncodedString()
+
+            call.resolve(["value": imageBase64])
         }
     }
-    
+
     @objc func getSupportedFlashModes(_ call: CAPPluginCall) {
         do {
             let supportedFlashModes = try self.cameraController.getSupportedFlashModes()
+
             call.resolve(["result": supportedFlashModes])
         } catch {
             call.reject("failed to get supported flash modes")
         }
     }
-    
+
     @objc func setFlashMode(_ call: CAPPluginCall) {
         guard let flashMode = call.getString("flashMode") else {
             call.reject("failed to set flash mode. required parameter flashMode is missing")
+
             return
         }
         do {
             var flashModeAsEnum: AVCaptureDevice.FlashMode?
+
             switch flashMode {
-                case "off" :
-                    flashModeAsEnum = AVCaptureDevice.FlashMode.off
-                case "on":
-                    flashModeAsEnum = AVCaptureDevice.FlashMode.on
-                case "auto":
-                    flashModeAsEnum = AVCaptureDevice.FlashMode.auto
-                default: break;
+            case "off" :
+                flashModeAsEnum = AVCaptureDevice.FlashMode.off
+            case "on":
+                flashModeAsEnum = AVCaptureDevice.FlashMode.on
+            case "auto":
+                flashModeAsEnum = AVCaptureDevice.FlashMode.auto
+            default: break;
             }
-            if flashModeAsEnum != nil {
-                try self.cameraController.setFlashMode(flashMode: flashModeAsEnum!)
-            } else if(flashMode == "torch") {
-                try self.cameraController.setTorchMode()
-            } else {
+
+            guard let flashModeEnum = flashModeAsEnum else {
+                if(flashMode == "torch") {
+                    try self.cameraController.setTorchMode()
+
+                    call.resolve()
+                    return
+                }
+
                 call.reject("Flash Mode not supported")
                 return
             }
+
+            try self.cameraController.setFlashMode(flashMode: flashModeEnum)
             call.resolve()
+
         } catch {
             call.reject("failed to set flash mode")
         }
