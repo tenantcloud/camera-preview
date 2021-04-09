@@ -8,7 +8,6 @@ import android.graphics.Bitmap.CompressFormat;
 import android.graphics.BitmapFactory;
 import android.graphics.Matrix;
 import android.graphics.Rect;
-import android.graphics.YuvImage;
 import android.hardware.Camera;
 import android.hardware.Camera.PictureCallback;
 import android.hardware.Camera.ShutterCallback;
@@ -40,8 +39,6 @@ public class CameraActivity extends Fragment {
   public interface CameraPreviewListener {
     void onPictureTaken(String originalPicture);
     void onPictureTakenError(String message);
-    void onSnapshotTaken(String originalPicture);
-    void onSnapshotTakenError(String message);
     void onFocusSet(int pointX, int pointY);
     void onFocusSetError(String message);
     void onBackButton();
@@ -576,39 +573,6 @@ public class CameraActivity extends Fragment {
       }
     }
     return output;
-  }
-  public void takeSnapshot(final int quality) {
-    mCamera.setPreviewCallback(new Camera.PreviewCallback() {
-      @Override
-      public void onPreviewFrame(byte[] bytes, Camera camera) {
-        try {
-          Camera.Parameters parameters = camera.getParameters();
-          Camera.Size size = parameters.getPreviewSize();
-          int orientation = mPreview.getDisplayOrientation();
-          if (mPreview.getCameraFacing() == Camera.CameraInfo.CAMERA_FACING_FRONT) {
-            bytes = rotateNV21(bytes, size.width, size.height, (360 - orientation) % 360);
-          } else {
-            bytes = rotateNV21(bytes, size.width, size.height, orientation);
-          }
-          // switch width/height when rotating 90/270 deg
-          Rect rect = orientation == 90 || orientation == 270 ?
-            new Rect(0, 0, size.height, size.width) :
-            new Rect(0, 0, size.width, size.height);
-          YuvImage yuvImage = new YuvImage(bytes, parameters.getPreviewFormat(), rect.width(), rect.height(), null);
-          ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-          yuvImage.compressToJpeg(rect, quality, byteArrayOutputStream);
-          byte[] data = byteArrayOutputStream.toByteArray();
-          byteArrayOutputStream.close();
-          eventListener.onSnapshotTaken(Base64.encodeToString(data, Base64.NO_WRAP));
-        } catch (IOException e) {
-          Log.d(TAG, "CameraPreview IOException");
-          eventListener.onSnapshotTakenError("IO Error");
-        } finally {
-
-          mCamera.setPreviewCallback(null);
-        }
-      }
-    });
   }
 
   public void takePicture(final int width, final int height, final int quality){
